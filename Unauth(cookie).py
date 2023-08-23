@@ -38,56 +38,58 @@ class BurpExtender(IBurpExtender, IProxyListener):
             requestInfo = self._helpers.analyzeRequest(httpService, messageInfo.getRequest())
 
             # 获取请求对象的URL
-            url = requestInfo.getUrl()
+            url = requestInfo.getUrl().toString()
 
             # 获取请求对象的请求方法
             method = requestInfo.getMethod()
 
             # 获取请求对象的请求头，类型为数组
             headers = requestInfo.getHeaders()
+            if (not self.checkSuffix(url)):
+                if self.isContain("Cookie:",headers):
+                    # 把请求头中Cookie字段删除，组成新的请求头数组
+                    newHeaders = [header for header in headers if not header.startswith("Cookie:")]
 
-            # 把请求头中Cookie字段删除，组成新的请求头数组
-            newHeaders = [header for header in headers if not header.startswith("Cookie:")]
+                    # 根据删除Cookie请求头、原始body，重新组装请求
+                    modifiedRequest = self._helpers.buildHttpMessage(newHeaders,
+                                                                     messageInfo.getRequest()[requestInfo.getBodyOffset():])
 
-            # 根据删除Cookie请求头、原始body，重新组装请求
-            modifiedRequest = self._helpers.buildHttpMessage(newHeaders,
-                                                             messageInfo.getRequest()[requestInfo.getBodyOffset():])
+                    # 发送修改后的请求
+                    response = self.makeHttpRequest(httpService, modifiedRequest)
 
-            # 发送修改后的请求
-            response = self.makeHttpRequest(httpService, modifiedRequest)
+                    # 解析返回
+                    responseInfo = self._helpers.analyzeResponse(response.getResponse())
 
-            # 解析返回
-            responseInfo = self._helpers.analyzeResponse(response.getResponse())
+                    # 得到返回包的body
+                    responseBody = response.getResponse()[responseInfo.getBodyOffset():]
 
-            # 得到返回包的body
-            responseBody = response.getResponse()[responseInfo.getBodyOffset():]
+                    # Print the relevant information
+                    print("===================================================================================")
+                    print("modiry", url)
+                    # print("Method:", method)
+                    # print("Request Headers:", self._helpers.bytesToString(modifiedRequest)[:requestInfo.getBodyOffset()])
 
-            # Print the relevant information
-            print("===================================================================================")
-            # print("modiry", url)
-            # print("Method:", method)
-            # print("Request Headers:", self._helpers.bytesToString(modifiedRequest)[:requestInfo.getBodyOffset()])
+                    # Print the response body of the modified request
+                    print("Modified Request Response Body:", url,self._helpers.bytesToString(responseBody))
 
-            # Print the response body of the modified request
-            print("Modified Request Response Body:", url,self._helpers.bytesToString(responseBody))
+                    # 发送原始请求
+                    originalResponse = self.makeHttpRequest(httpService, messageInfo.getRequest())
 
-            # 发送原始请求
-            originalResponse = self.makeHttpRequest(httpService, messageInfo.getRequest())
+                    # 解析返回
+                    originalResponseInfo = self._helpers.analyzeResponse(originalResponse.getResponse())
 
-            # 解析返回
-            originalResponseInfo = self._helpers.analyzeResponse(originalResponse.getResponse())
+                    # 得到返回包的body
+                    originalResponseBody = originalResponse.getResponse()[originalResponseInfo.getBodyOffset():]
 
-            # 得到返回包的body
-            originalResponseBody = originalResponse.getResponse()[originalResponseInfo.getBodyOffset():]
+                    print("Original Request Response Body:", url,self._helpers.bytesToString(originalResponseBody))
 
-            print("Original Request Response Body:", url,self._helpers.bytesToString(originalResponseBody))
+                    # 对比两次返回的值是否一直
+                    if self._helpers.bytesToString(responseBody) == self._helpers.bytesToString(originalResponseBody):
+                        # 在proxy栏里边将该请求标记为红色
+                        messageInfo.setHighlight("red")
 
-            # 对比两次返回的值是否一直
-            if self._helpers.bytesToString(responseBody) == self._helpers.bytesToString(originalResponseBody):
-                # 在proxy栏里边将该请求标记为红色
-                messageInfo.setHighlight("red")
+                    print("***********************************************************************************")
 
-            print("***********************************************************************************")
 
     def makeHttpRequest(self, httpService, request):
         '''
@@ -98,3 +100,33 @@ class BurpExtender(IBurpExtender, IProxyListener):
         '''
 
         return self._callbacks.makeHttpRequest(httpService, request)
+
+    def isContain(self,findStr,lis):
+        '''
+        查找findStr字符串是否存在headers中
+        :param findStr: 查找字符串
+        :param headers: 查找的数据
+        :return:
+        '''
+        for li in lis:
+            if li.startswith(findStr):
+                return True
+        return False
+
+    def checkSuffix(self,url):
+        '''
+        根据url判断是否访问图片等资源，当访问资源是图片、js时返回True，不是的话返回False
+        :param url: url
+        :return:
+        '''
+        suffixBlack = [
+            ".js", ".jsx", ".coffee", ".ts",
+            ".css", ".less", ".scss", ".sass",
+            ".ico", ".jpg", ".png", ".gif", ".bmp", ".svg",
+            ".ttf", ".eot", ".woff", ".woff2",
+            ".ejs", ".jade", ".vue"
+        ]
+        for suffix in suffixBlack:
+            if url.endswith(suffix):
+                return True
+        return False
