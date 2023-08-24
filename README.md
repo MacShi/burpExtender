@@ -10,11 +10,11 @@ BurpSuite 是使用 Java 编程语言编写的，所以想要使用 Python 编�
 
 Python 编写的插件文件后缀为 py 文件，不能由 Burp 直接加载，所以在加载前需要先设置 Jython 的路径。在 [Jython 官方](https://www.jython.org/download.html)下载页面选择 Jython 独立 jar 包（jython-standalone）。然后再burp里边配置jython和python的模块路径。
 
-![image-20230824161525744](D:\software\burp\extender\burpExtender\image-001.png)
+![image-20230824161525744](image-001.png)
 
 环境搭建好后就可以在"Extensions"模块中使用插件了。
 
-![image-20230824155814644](D:\software\burp\extender\burpExtender\image-002.png)
+![image-20230824155814644](image-002.png)
 
 ### 插件介绍
 
